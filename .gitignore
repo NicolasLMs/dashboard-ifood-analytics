@@ -1,0 +1,14 @@
+# Node.js
+node_modules/
+npm-debug.log
+
+# Python (caso esteja na mesma pasta)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Variáveis de ambiente e sistema
+.env
+.DS_Store
+Thumbs.db

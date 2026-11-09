@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iFood Analytics - Dashboard de Vendas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen">
+
+    <!-- Cabeçalho -->
+    <header class="bg-red-600 text-white shadow-md">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+            <div class="flex items-center gap-3">
+                <span class="bg-white text-red-600 font-extrabold px-3 py-1 rounded-lg text-lg tracking-tight">iFood</span>
+                <h1 class="text-xl font-bold">Painel Analítico de Restaurantes</h1>
+            </div>
+            <span id="status-conexao" class="text-xs bg-red-700 px-3 py-1 rounded-full">Conectado à API local</span>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 py-6 space-y-6">
+
+        <!-- Barra de Filtros -->
+        <section class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                
+                <!-- Filtro Restaurante -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Restaurante</label>
+                    <select id="filtro-restaurante" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none">
+                        <option value="todos">Todos os Restaurantes</option>
+                    </select>
+                </div>
+
+                <!-- Filtro Status -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Status do Pedido</label>
+                    <select id="filtro-status" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none">
+                        <option value="todos">Todos os Status</option>
+                        <option value="ENTREGUE" selected>Entregue</option>
+                        <option value="CONFIRMADO">Confirmado</option>
+                        <option value="EM_PREPARACAO">Em Preparação</option>
+                        <option value="SAIU_PARA_ENTREGA">Saiu para Entrega</option>
+                        <option value="CANCELADO">Cancelado</option>
+                    </select>
+                </div>
+
+                <!-- Data Inicial -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Data Início</label>
+                    <input type="date" id="filtro-data-inicio" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none">
+                </div>
+
+                <!-- Data Final -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Data Fim</label>
+                    <input type="date" id="filtro-data-fim" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none">
+                </div>
+
+                <!-- Botões de Ação -->
+                <div class="flex gap-2">
+                    <button onclick="carregarDashboard()" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg text-sm transition">
+                        Filtrar
+                    </button>
+                    <button onclick="limparFiltros()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-2 px-3 rounded-lg text-sm transition" title="Limpar Filtros">
+                        Limpar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Atalhos Rápidos de Data -->
+            <div class="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2 flex-wrap">
+                <span class="text-xs text-slate-400 font-medium mr-1">Período rápido:</span>
+                <button onclick="definirPeriodo(0)" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition">Hoje</button>
+                <button onclick="definirPeriodo(7)" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition">Últimos 7 dias</button>
+                <button onclick="definirPeriodo(30)" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition">Últimos 30 dias</button>
+                <button onclick="definirPeriodo(null)" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition">Todo o período</button>
+            </div>
+        </section>
+
+        <!-- Cards de Indicadores (KPIs) -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <p class="text-xs font-semibold text-slate-400 uppercase">Faturamento dos Pedidos</p>
+                <h3 id="kpi-faturamento" class="text-2xl font-bold text-slate-800 mt-1">R$ 0,00</h3>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <p class="text-xs font-semibold text-slate-400 uppercase">Total de Pedidos</p>
+                <h3 id="kpi-pedidos" class="text-2xl font-bold text-slate-800 mt-1">0</h3>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <p class="text-xs font-semibold text-slate-400 uppercase">Ticket Médio</p>
+                <h3 id="kpi-ticket" class="text-2xl font-bold text-slate-800 mt-1">R$ 0,00</h3>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <p class="text-xs font-semibold text-slate-400 uppercase">Unidades Vendidas (Top 10)</p>
+                <h3 id="kpi-itens" class="text-2xl font-bold text-red-600 mt-1">0 un.</h3>
+            </div>
+        </section>
+
+        <!-- Área de Gráficos -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Gráfico Principal: Top 10 Produtos -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 lg:col-span-2">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
+                    <h2 class="text-base font-bold text-slate-800">Top 10 Produtos Mais Vendidos</h2>
+                    <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
+                        <button id="btn-metrica-qtd" onclick="alternarMetrica('quantidade')" class="px-3 py-1 text-xs font-semibold rounded-md bg-red-600 text-white transition">
+                            Por Quantidade
+                        </button>
+                        <button id="btn-metrica-fat" onclick="alternarMetrica('faturamento')" class="px-3 py-1 text-xs font-semibold rounded-md text-slate-600 hover:text-slate-900 transition">
+                            Por Faturamento (R$)
+                        </button>
+                    </div>
+                </div>
+                <div class="relative h-80">
+                    <canvas id="graficoTop10"></canvas>
+                </div>
+            </div>
+
+            <!-- Gráfico Secundário: Evolução Diária -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-base font-bold text-slate-800 mb-4">Evolução de Faturamento Diário</h2>
+                <div class="relative h-80">
+                    <canvas id="graficoEvolucao"></canvas>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Tabela Detalhada do Ranking -->
+        <section class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100">
+                <h2 class="text-base font-bold text-slate-800">Detalhamento do Ranking (Top 10)</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 text-slate-500 text-xs uppercase">
+                            <th class="py-3 px-6 font-semibold">Posição</th>
+                            <th class="py-3 px-6 font-semibold">Produto</th>
+                            <th class="py-3 px-6 font-semibold">Restaurante</th>
+                            <th class="py-3 px-6 font-semibold text-right">Qtd. Vendida</th>
+                            <th class="py-3 px-6 font-semibold text-right">Receita Gerada</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-ranking" class="divide-y divide-slate-100 text-sm">
+                        <!-- Preenchido via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        const API_URL = 'http://localhost:3000/api';
+        let chartTop10Instance = null;
+        let chartEvolucaoInstance = null;
+        let dadosTop10Cache = [];
+        let metricaAtual = 'quantidade'; // 'quantidade' ou 'faturamento'
+
+        const formatarMoeda = (valor) => 
+            Number(valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        // 1. Carrega a lista de restaurantes no <select>
+        async function carregarRestaurantes() {
+            try {
+                const res = await fetch(`${API_URL}/restaurantes`);
+                const restaurantes = await res.json();
+                const select = document.getElementById('filtro-restaurante');
+                
+                restaurantes.forEach(r => {
+                    const option = document.createElement('option');
+                    option.value = r.id;
+                    option.textContent = `${r.nome} (${r.categoria_principal})`;
+                    select.appendChild(option);
+                });
+            } catch (err) {
+                console.error('Erro ao buscar restaurantes:', err);
+            }
+        }
+
+        // 2. Busca os dados filtrados da API e atualiza a tela
+        async function carregarDashboard() {
+            const restauranteId = document.getElementById('filtro-restaurante').value;
+            const status = document.getElementById('filtro-status').value;
+            const dataInicio = document.getElementById('filtro-data-inicio').value;
+            const dataFim = document.getElementById('filtro-data-fim').value;
+
+            const params = new URLSearchParams({ restauranteId, status, dataInicio, dataFim });
+
+            try {
+                const res = await fetch(`${API_URL}/dashboard?${params.toString()}`);
+                const dados = await res.json();
+
+                // Atualiza KPIs
+                document.getElementById('kpi-faturamento').textContent = formatarMoeda(dados.kpis.faturamento_total);
+                document.getElementById('kpi-pedidos').textContent = dados.kpis.total_pedidos;
+                document.getElementById('kpi-ticket').textContent = formatarMoeda(dados.kpis.ticket_medio);
+                document.getElementById('kpi-itens').textContent = `${dados.kpis.total_itens_top10} un.`;
+
+                // Salva cache do Top 10 e renderiza componentes
+                dadosTop10Cache = dados.top10 || [];
+                renderizarGraficoTop10();
+                renderizarGraficoEvolucao(dados.evolucao || []);
+                renderizarTabela(dadosTop10Cache);
+
+            } catch (err) {
+                console.error('Erro ao carregar dashboard:', err);
+                document.getElementById('status-conexao').textContent = 'Erro de conexão com a API';
+                document.getElementById('status-conexao').className = 'text-xs bg-black text-red-400 px-3 py-1 rounded-full';
+            }
+        }
+
+        // 3. Renderiza o Gráfico Horizontal de Top 10 Produtos
+        function renderizarGraficoTop10() {
+            const ctx = document.getElementById('graficoTop10').getContext('2d');
+            if (chartTop10Instance) chartTop10Instance.destroy();
+
+            const labels = dadosTop10Cache.map(item => `${item.produto} (${item.restaurante})`);
+            const valores = dadosTop10Cache.map(item => 
+                metricaAtual === 'quantidade' ? item.total_vendido : item.faturamento_produto
+            );
+
+            chartTop10Instance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: metricaAtual === 'quantidade' ? 'Unidades Vendidas' : 'Faturamento (R$)',
+                        data: valores,
+                        backgroundColor: metricaAtual === 'quantidade' ? 'rgba(220, 38, 38, 0.85)' : 'rgba(16, 185, 129, 0.85)',
+                        borderRadius: 6,
+                    }]
+                },
+                options: {
+                    indexAxis: 'y', // Barras horizontais facilitam a leitura dos nomes dos produtos
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        // 4. Alterna o gráfico entre Quantidade e Faturamento (R$)
+        function alternarMetrica(novaMetrica) {
+            metricaAtual = novaMetrica;
+            const btnQtd = document.getElementById('btn-metrica-qtd');
+            const btnFat = document.getElementById('btn-metrica-fat');
+
+            if (novaMetrica === 'quantidade') {
+                btnQtd.className = 'px-3 py-1 text-xs font-semibold rounded-md bg-red-600 text-white transition';
+                btnFat.className = 'px-3 py-1 text-xs font-semibold rounded-md text-slate-600 hover:text-slate-900 transition';
+            } else {
+                btnFat.className = 'px-3 py-1 text-xs font-semibold rounded-md bg-emerald-600 text-white transition';
+                btnQtd.className = 'px-3 py-1 text-xs font-semibold rounded-md text-slate-600 hover:text-slate-900 transition';
+            }
+            renderizarGraficoTop10();
+        }
+
+        // 5. Renderiza o Gráfico de Linha (Evolução por Dia)
+        function renderizarGraficoEvolucao(evolucao) {
+            const ctx = document.getElementById('graficoEvolucao').getContext('2d');
+            if (chartEvolucaoInstance) chartEvolucaoInstance.destroy();
+
+            chartEvolucaoInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: evolucao.map(d => d.data_formatada),
+                    datasets: [{
+                        label: 'Faturamento Diário (R$)',
+                        data: evolucao.map(d => d.faturamento_dia),
+                        borderColor: '#dc2626',
+                        backgroundColor: 'rgba(220, 38, 38, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        // 6. Preenche a tabela com os dados detalhados
+        function renderizarTabela(lista) {
+            const tbody = document.getElementById('tabela-ranking');
+            tbody.innerHTML = '';
+
+            if (lista.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-400">Nenhum produto encontrado para os filtros selecionados.</td></tr>`;
+                return;
+            }
+
+            lista.forEach((item, index) => {
+                const medalha = index === 0 ? '🥇 1º' : index === 1 ? '🥈 2º' : index === 2 ? '🥉 3º' : `${index + 1}º`;
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition';
+                tr.innerHTML = `
+                    <td class="py-3 px-6 font-bold text-slate-700">${medalha}</td>
+                    <td class="py-3 px-6 font-semibold text-slate-800">${item.produto}</td>
+                    <td class="py-3 px-6 text-slate-500">${item.restaurante}</td>
+                    <td class="py-3 px-6 text-right font-semibold">${item.total_vendido} un.</td>
+                    <td class="py-3 px-6 text-right font-bold text-emerald-600">${formatarMoeda(item.faturamento_produto)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // 7. Funções auxiliares de filtro de data
+        function definirPeriodo(dias) {
+            const inputInicio = document.getElementById('filtro-data-inicio');
+            const inputFim = document.getElementById('filtro-data-fim');
+
+            if (dias === null) {
+                inputInicio.value = '';
+                inputFim.value = '';
+            } else {
+                const hoje = new Date();
+                const inicio = new Date();
+                inicio.setDate(hoje.getDate() - dias);
+
+                inputFim.value = hoje.toISOString().split('T')[0];
+                inputInicio.value = inicio.toISOString().split('T')[0];
+            }
+            carregarDashboard();
+        }
+
+        function limparFiltros() {
+            document.getElementById('filtro-restaurante').value = 'todos';
+            document.getElementById('filtro-status').value = 'todos';
+            definirPeriodo(null);
+        }
+
+        // Inicialização
+        window.addEventListener('DOMContentLoaded', async () => {
+            await carregarRestaurantes();
+            await carregarDashboard();
+        });
+    </script>
+</body>
+</html>
