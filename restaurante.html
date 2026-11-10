@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iFood Analytics - Dashboard de Restaurantes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen">
+
+    <!-- Cabeçalho -->
+    <header class="bg-red-600 text-white shadow-md">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+            <div class="flex items-center gap-3">
+                <span class="bg-white text-red-600 font-extrabold px-3 py-1 rounded-lg text-lg tracking-tight">iFood</span>
+                <h1 class="text-xl font-bold">Painel Analítico de Restaurantes</h1>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="index.html" class="text-xs bg-red-700 hover:bg-red-800 px-3 py-1 rounded-full transition">← Painel de Vendas</a>
+                <span id="status-conexao" class="text-xs bg-red-700 px-3 py-1 rounded-full">Conectado à API local</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 py-6 space-y-6">
+
+        <!-- Barra de Filtros -->
+        <section class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+
+                <!-- Data Inicial -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Data Início</label>
+                    <input type="date" id="filtro-data-inicio" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none">
+                </div>
+
+                <!-- Data Final -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Data Fim</label>
+                    <input type="date" id="filtro-data-fim" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none">
+                </div>
+
+                <!-- Botões -->
+                <div class="flex gap-2">
+                    <button onclick="carregarDashboard()" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg text-sm transition">
+                        Filtrar
+                    </button>
+                    <button onclick="limparFiltros()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-2 px-3 rounded-lg text-sm transition" title="Limpar Filtros">
+                        Limpar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Atalhos de Período -->
+            <div class="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2 flex-wrap">
+                <span class="text-xs text-slate-400 font-medium mr-1">Período rápido:</span>
+                <button onclick="definirPeriodo(0)"   class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition">Hoje</button>
+                <button onclick="definirPeriodo(7)"   class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition">Últimos 7 dias</button>
+                <button onclick="definirPeriodo(30)"  class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition">Últimos 30 dias</button>
+                <button onclick="definirPeriodo(null)" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition">Todo o período</button>
+            </div>
+        </section>
+
+        <!-- KPIs -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <p class="text-xs font-semibold text-slate-400 uppercase">Restaurantes Cadastrados</p>
+                <h3 id="kpi-restaurantes" class="text-2xl font-bold text-slate-800 mt-1">0</h3>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <p class="text-xs font-semibold text-slate-400 uppercase">Total de Pedidos</p>
+                <h3 id="kpi-pedidos" class="text-2xl font-bold text-slate-800 mt-1">0</h3>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <p class="text-xs font-semibold text-slate-400 uppercase">Faturamento Total</p>
+                <h3 id="kpi-faturamento" class="text-2xl font-bold text-emerald-600 mt-1">R$ 0,00</h3>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <p class="text-xs font-semibold text-slate-400 uppercase">Produtos no Cardápio</p>
+                <h3 id="kpi-produtos" class="text-2xl font-bold text-red-600 mt-1">0</h3>
+            </div>
+        </section>
+
+        <!-- Gráficos — linha 1 -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Market Share (donut) -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+                <h2 class="text-base font-bold text-slate-800 mb-1">Representatividade (%)</h2>
+                <p class="text-xs text-slate-400 mb-4">Distribuição percentual do faturamento</p>
+                <div class="relative flex-1 min-h-[260px]">
+                    <canvas id="graficoMarketShare"></canvas>
+                </div>
+            </div>
+
+            <!-- Receita bruta por restaurante (barras horizontais) -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 lg:col-span-2 flex flex-col">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-800">Receita Bruta por Restaurante</h2>
+                        <p class="text-xs text-slate-400">Comparação direta do faturamento total em R$</p>
+                    </div>
+                    <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
+                        <button id="btn-receita-fat" onclick="alternarMetricaReceita('faturamento')" class="px-3 py-1 text-xs font-semibold rounded-md bg-red-600 text-white transition">
+                            Por Volume
+                        </button>
+                        <button id="btn-receita-ped" onclick="alternarMetricaReceita('pedidos')" class="px-3 py-1 text-xs font-semibold rounded-md text-slate-600 hover:text-slate-900 transition">
+                            Por Pedidos
+                        </button>
+                    </div>
+                </div>
+                <div class="relative flex-1 min-h-[260px]">
+                    <canvas id="graficoReceita"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Gráficos — linha 2 -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <!-- Evolução diária -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-base font-bold text-slate-800 mb-4">Evolução de Pedidos por Dia</h2>
+                <div class="relative h-64">
+                    <canvas id="graficoEvolucao"></canvas>
+                </div>
+            </div>
+
+            <!-- Top 5 Produtos -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-base font-bold text-slate-800 mb-4">Top 5 Produtos Mais Vendidos</h2>
+                <div class="relative h-64">
+                    <canvas id="graficoTopProdutos"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tabela de Restaurantes -->
+        <section class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <h2 class="text-base font-bold text-slate-800">Detalhamento por Restaurante</h2>
+                <span class="text-xs text-slate-400">Pedidos com status ativo (excluídos cancelados e aguardando pagamento)</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 text-slate-500 text-xs uppercase">
+                            <th class="py-3 px-6 font-semibold">Pos.</th>
+                            <th class="py-3 px-6 font-semibold">Restaurante</th>
+                            <th class="py-3 px-6 font-semibold">Categoria</th>
+                            <th class="py-3 px-6 font-semibold text-right">Pedidos</th>
+                            <th class="py-3 px-6 font-semibold text-right">Ticket Médio</th>
+                            <th class="py-3 px-6 font-semibold text-right">Cancelados</th>
+                            <th class="py-3 px-6 font-semibold text-right">Receita Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-restaurantes" class="divide-y divide-slate-100 text-sm">
+                        <!-- Preenchido via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        const API_URL = 'http://localhost:3000/api';
+
+        // Instâncias dos gráficos
+        let chartMarketShare  = null;
+        let chartReceita      = null;
+        let chartEvolucao     = null;
+        let chartTopProdutos  = null;
+
+        // Cache de dados para alternar métricas sem re-fetch
+        let dadosReceitaCache = [];
+        let metricaReceita    = 'faturamento';
+
+        const formatarMoeda = v =>
+            Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        // Paleta de cores padrão
+        const CORES = [
+            '#dc2626', '#f97316', '#eab308', '#22c55e',
+            '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6',
+            '#f43f5e', '#a3e635',
+        ];
+
+        // ── Carregamento principal ──────────────────────────────────────────────
+
+        async function carregarDashboard() {
+            const dataInicio = document.getElementById('filtro-data-inicio').value;
+            const dataFim    = document.getElementById('filtro-data-fim').value;
+            const params     = new URLSearchParams({ dataInicio, dataFim });
+
+            try {
+                const res   = await fetch(`${API_URL}/restaurantes/dashboard?${params}`);
+                const dados = await res.json();
+
+                // KPIs
+                document.getElementById('kpi-restaurantes').textContent  = dados.kpis.total_restaurantes;
+                document.getElementById('kpi-pedidos').textContent        = dados.kpis.total_pedidos;
+                document.getElementById('kpi-faturamento').textContent    = formatarMoeda(dados.kpis.faturamento_total);
+                document.getElementById('kpi-produtos').textContent       = dados.kpis.total_produtos;
+
+                // Gráficos
+                dadosReceitaCache = dados.receita || [];
+                renderizarMarketShare(dados.marketShare  || []);
+                renderizarReceita();
+                renderizarEvolucao(dados.evolucao        || []);
+                renderizarTopProdutos(dados.topProdutos  || []);
+                renderizarTabela(dadosReceitaCache);
+
+            } catch (err) {
+                console.error('Erro ao carregar dashboard:', err);
+                const el = document.getElementById('status-conexao');
+                el.textContent  = 'Erro de conexão com a API';
+                el.className    = 'text-xs bg-black text-red-400 px-3 py-1 rounded-full';
+            }
+        }
+
+        // ── Gráfico Donut — Market Share ────────────────────────────────────────
+
+        function renderizarMarketShare(dados) {
+            const ctx = document.getElementById('graficoMarketShare').getContext('2d');
+            if (chartMarketShare) chartMarketShare.destroy();
+
+            const total = dados.reduce((s, d) => s + d.receita_total, 0);
+            const labels = dados.map(d => d.restaurante);
+            const values = dados.map(d =>
+                total > 0 ? parseFloat(((d.receita_total / total) * 100).toFixed(1)) : 0
+            );
+
+            chartMarketShare = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: CORES.slice(0, labels.length),
+                        borderWidth: 2,
+                        borderColor: '#fff',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { font: { size: 11 }, padding: 12, boxWidth: 12 }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ` ${ctx.label}: ${ctx.parsed}%`
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ── Gráfico Barras Horizontais — Receita por Restaurante ───────────────
+
+        function renderizarReceita() {
+            const ctx = document.getElementById('graficoReceita').getContext('2d');
+            if (chartReceita) chartReceita.destroy();
+
+            // Ordena pelo valor escolhido
+            const ordenado = [...dadosReceitaCache].sort((a, b) =>
+                metricaReceita === 'faturamento'
+                    ? b.receita_total - a.receita_total
+                    : b.total_pedidos - a.total_pedidos
+            );
+
+            const labels  = ordenado.map(d => d.restaurante);
+            const valores  = ordenado.map(d =>
+                metricaReceita === 'faturamento' ? d.receita_total : d.total_pedidos
+            );
+
+            // Gradiente de cores: vermelho → laranja → amarelo conforme posição
+            const gradienteCores = labels.map((_, i) => {
+                const ratio = labels.length > 1 ? i / (labels.length - 1) : 0;
+                const r = Math.round(220 - ratio * (220 - 234));
+                const g = Math.round(38  + ratio * (179 - 38));
+                const b = Math.round(38  + ratio * (8   - 38));
+                return `rgba(${r},${g},${b},0.85)`;
+            });
+
+            chartReceita = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: metricaReceita === 'faturamento' ? 'Receita (R$)' : 'Pedidos',
+                        data: valores,
+                        backgroundColor: gradienteCores,
+                        borderRadius: 6,
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { beginAtZero: true } }
+                }
+            });
+        }
+
+        function alternarMetricaReceita(metrica) {
+            metricaReceita = metrica;
+            const btnFat = document.getElementById('btn-receita-fat');
+            const btnPed = document.getElementById('btn-receita-ped');
+
+            if (metrica === 'faturamento') {
+                btnFat.className = 'px-3 py-1 text-xs font-semibold rounded-md bg-red-600 text-white transition';
+                btnPed.className = 'px-3 py-1 text-xs font-semibold rounded-md text-slate-600 hover:text-slate-900 transition';
+            } else {
+                btnPed.className = 'px-3 py-1 text-xs font-semibold rounded-md bg-blue-600 text-white transition';
+                btnFat.className = 'px-3 py-1 text-xs font-semibold rounded-md text-slate-600 hover:text-slate-900 transition';
+            }
+            renderizarReceita();
+        }
+
+        // ── Gráfico de Linha — Evolução por Dia ────────────────────────────────
+
+        function renderizarEvolucao(evolucao) {
+            const ctx = document.getElementById('graficoEvolucao').getContext('2d');
+            if (chartEvolucao) chartEvolucao.destroy();
+
+            chartEvolucao = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: evolucao.map(d => d.data_formatada),
+                    datasets: [{
+                        label: 'Pedidos por dia',
+                        data: evolucao.map(d => d.qtd_pedidos),
+                        borderColor: '#dc2626',
+                        backgroundColor: 'rgba(220,38,38,0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 4,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                }
+            });
+        }
+
+        // ── Gráfico Barras — Top 5 Produtos ────────────────────────────────────
+
+        function renderizarTopProdutos(dados) {
+            const ctx = document.getElementById('graficoTopProdutos').getContext('2d');
+            if (chartTopProdutos) chartTopProdutos.destroy();
+
+            chartTopProdutos = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: dados.map(d => `${d.produto} (${d.restaurante})`),
+                    datasets: [{
+                        label: 'Unidades vendidas',
+                        data: dados.map(d => d.total_vendido),
+                        backgroundColor: 'rgba(220,38,38,0.85)',
+                        borderRadius: 6,
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { beginAtZero: true } }
+                }
+            });
+        }
+
+        // ── Tabela ──────────────────────────────────────────────────────────────
+
+        function renderizarTabela(lista) {
+            const tbody = document.getElementById('tabela-restaurantes');
+            tbody.innerHTML = '';
+
+            if (lista.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-400">Nenhum dado encontrado para o período selecionado.</td></tr>`;
+                return;
+            }
+
+            lista.forEach((item, index) => {
+                const medalha = index === 0 ? '🥇 1º' : index === 1 ? '🥈 2º' : index === 2 ? '🥉 3º' : `${index + 1}º`;
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition';
+                tr.innerHTML = `
+                    <td class="py-3 px-6 font-bold text-slate-700">${medalha}</td>
+                    <td class="py-3 px-6 font-semibold text-slate-800">${item.restaurante}</td>
+                    <td class="py-3 px-6 text-slate-500">${item.categoria}</td>
+                    <td class="py-3 px-6 text-right font-semibold">${item.total_pedidos}</td>
+                    <td class="py-3 px-6 text-right text-slate-600">${formatarMoeda(item.ticket_medio)}</td>
+                    <td class="py-3 px-6 text-right ${item.pedidos_cancelados > 0 ? 'text-red-500 font-semibold' : 'text-slate-400'}">${item.pedidos_cancelados}</td>
+                    <td class="py-3 px-6 text-right font-bold text-emerald-600">${formatarMoeda(item.receita_total)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // ── Filtros de período ──────────────────────────────────────────────────
+
+        function definirPeriodo(dias) {
+            const inputInicio = document.getElementById('filtro-data-inicio');
+            const inputFim    = document.getElementById('filtro-data-fim');
+
+            if (dias === null) {
+                inputInicio.value = '';
+                inputFim.value    = '';
+            } else {
+                const hoje  = new Date();
+                const inicio = new Date();
+                inicio.setDate(hoje.getDate() - dias);
+                inputFim.value   = hoje.toISOString().split('T')[0];
+                inputInicio.value = inicio.toISOString().split('T')[0];
+            }
+            carregarDashboard();
+        }
+
+        function limparFiltros() {
+            definirPeriodo(null);
+        }
+
+        // Inicialização
+        window.addEventListener('DOMContentLoaded', () => carregarDashboard());
+    </script>
+</body>
+</html>
