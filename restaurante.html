@@ -18,6 +18,7 @@
             </div>
             <div class="flex items-center gap-3">
                 <a href="index.html" class="text-xs bg-red-700 hover:bg-red-800 px-3 py-1 rounded-full transition">← Painel de Vendas</a>
+                <a href="ticket-medio.html" class="text-xs bg-red-700 hover:bg-red-800 px-3 py-1 rounded-full transition">Ticket Médio por Dia</a>
                 <span id="status-conexao" class="text-xs bg-red-700 px-3 py-1 rounded-full">Conectado à API local</span>
             </div>
         </div>
@@ -136,6 +137,25 @@
             </div>
         </section>
 
+        <!-- Relatório 3: Ticket Médio por Dia por Restaurante -->
+        <section class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+                <div>
+                    <h2 class="text-base font-bold text-slate-800">Ticket Médio por Dia</h2>
+                    <p class="text-xs text-slate-400">Evolução do ticket médio diário por restaurante</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="text-xs font-semibold text-slate-500 uppercase">Restaurante</label>
+                    <select id="filtro-restaurante-r3" class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-red-500 outline-none">
+                        <option value="todos">Todos</option>
+                    </select>
+                </div>
+            </div>
+            <div class="relative h-72">
+                <canvas id="graficoTicketMedioDia"></canvas>
+            </div>
+        </section>
+
         <!-- Tabela de Restaurantes -->
         <section class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div class="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
@@ -168,10 +188,11 @@
         const API_URL = 'http://localhost:3000/api';
 
         // Instâncias dos gráficos
-        let chartMarketShare  = null;
-        let chartReceita      = null;
-        let chartEvolucao     = null;
-        let chartTopProdutos  = null;
+        let chartMarketShare     = null;
+        let chartReceita         = null;
+        let chartEvolucao        = null;
+        let chartTopProdutos     = null;
+        let chartTicketMedioDia  = null;
 
         // Cache de dados para alternar métricas sem re-fetch
         let dadosReceitaCache = [];
@@ -408,6 +429,95 @@
             });
         }
 
+        // ── Relatório 3: Ticket Médio por Dia ──────────────────────────────────
+
+        async function carregarTicketMedioDia() {
+            const dataInicio     = document.getElementById('filtro-data-inicio').value;
+            const dataFim        = document.getElementById('filtro-data-fim').value;
+            const restauranteId  = document.getElementById('filtro-restaurante-r3').value;
+            const params         = new URLSearchParams({ dataInicio, dataFim, restauranteId });
+
+            try {
+                const res  = await fetch(`${API_URL}/restaurantes/ticket-medio-dia?${params}`);
+                const rows = await res.json();
+                renderizarTicketMedioDia(rows);
+            } catch (err) {
+                console.error('Erro ao carregar ticket médio por dia:', err);
+            }
+        }
+
+        function renderizarTicketMedioDia(rows) {
+            const ctx = document.getElementById('graficoTicketMedioDia').getContext('2d');
+            if (chartTicketMedioDia) chartTicketMedioDia.destroy();
+
+            // Agrupa por restaurante → { nome: [ { data, ticket } ] }
+            const porRestaurante = {};
+            const datasSet       = new Set();
+
+            rows.forEach(r => {
+                if (!porRestaurante[r.restaurante]) porRestaurante[r.restaurante] = {};
+                porRestaurante[r.restaurante][r.data_formatada] = r.ticket_medio;
+                datasSet.add(r.data_formatada);
+            });
+
+            // Mantém a ordem cronológica das datas
+            const labels   = [...datasSet];
+            const nomes    = Object.keys(porRestaurante);
+
+            const datasets = nomes.map((nome, i) => ({
+                label: nome,
+                data: labels.map(d => porRestaurante[nome][d] ?? null),
+                borderColor: CORES[i % CORES.length],
+                backgroundColor: CORES[i % CORES.length] + '22',
+                fill: false,
+                tension: 0.3,
+                pointRadius: 4,
+                spanGaps: false,
+            }));
+
+            chartTicketMedioDia = new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { font: { size: 11 }, padding: 12, boxWidth: 12 }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ` ${ctx.dataset.label}: ${formatarMoeda(ctx.parsed.y)}`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: v => 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Popula o select do Relatório 3 com os restaurantes já carregados
+        function popularSelectR3(lista) {
+            const select = document.getElementById('filtro-restaurante-r3');
+            // Limpa opções antigas (mantém "Todos")
+            select.innerHTML = '<option value="todos">Todos</option>';
+            lista.forEach(r => {
+                const opt = document.createElement('option');
+                opt.value       = r.id;
+                opt.textContent = r.nome;
+                select.appendChild(opt);
+            });
+            select.addEventListener('change', carregarTicketMedioDia);
+        }
+
         // ── Filtros de período ──────────────────────────────────────────────────
 
         function definirPeriodo(dias) {
@@ -425,6 +535,7 @@
                 inputInicio.value = inicio.toISOString().split('T')[0];
             }
             carregarDashboard();
+            carregarTicketMedioDia();
         }
 
         function limparFiltros() {
@@ -432,7 +543,13 @@
         }
 
         // Inicialização
-        window.addEventListener('DOMContentLoaded', () => carregarDashboard());
+        window.addEventListener('DOMContentLoaded', async () => {
+            const res   = await fetch(`${API_URL}/restaurantes/lista`);
+            const lista = await res.json();
+            popularSelectR3(lista);
+            await carregarDashboard();
+            await carregarTicketMedioDia();
+        });
     </script>
 </body>
 </html>

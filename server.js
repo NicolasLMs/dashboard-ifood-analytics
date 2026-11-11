@@ -3,9 +3,14 @@ const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
 
+const path = require('path');
+
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Serve os arquivos HTML estáticos (index.html, restaurante.html)
+app.use(express.static(path.join(__dirname)));
 
 const pool = new Pool({
   user: process.env.POSTGRES_USER,
@@ -270,6 +275,53 @@ app.get('/api/restaurantes/dashboard', async (req, res) => {
   } catch (err) {
     console.error('Erro na rota /api/restaurantes/dashboard:', err);
     res.status(500).json({ erro: 'Erro ao processar dados do dashboard de restaurantes' });
+  }
+});
+
+// R3. Ticket Médio por Dia por Restaurante (baseado no preço unitário dos produtos)
+app.get('/api/restaurantes/ticket-medio-dia', async (req, res) => {
+  const { dataInicio, dataFim, restauranteId } = req.query;
+
+  const filtros = [];
+  const valores = [];
+
+  if (dataInicio) {
+    valores.push(`${dataInicio} 00:00:00`);
+    filtros.push(`ped.criado_em >= $${valores.length}`);
+  }
+  if (dataFim) {
+    valores.push(`${dataFim} 23:59:59`);
+    filtros.push(`ped.criado_em <= $${valores.length}`);
+  }
+  if (restauranteId && restauranteId !== 'todos') {
+    valores.push(restauranteId);
+    filtros.push(`r.id = $${valores.length}`);
+  }
+
+  const whereClause = filtros.length > 0 ? `WHERE ${filtros.join(' AND ')}` : '';
+
+  try {
+    const query = `
+      SELECT
+        r.nome                                              AS restaurante,
+        TO_CHAR(ped.criado_em, 'DD/MM')                    AS data_formatada,
+        DATE(ped.criado_em)                                AS data_ordem,
+        ROUND((SUM(ip.preco_unitario * ip.quantidade) / SUM(ip.quantidade))::NUMERIC, 2)::FLOAT AS ticket_medio,
+        SUM(ip.quantidade)::INT                            AS total_itens,
+        COUNT(DISTINCT ped.id)::INT                        AS total_pedidos
+      FROM item_pedido ip
+      JOIN pedido ped ON ip.pedido_id = ped.id
+      JOIN restaurante r ON ped.restaurante_id = r.id
+      ${whereClause}
+      GROUP BY r.nome, DATE(ped.criado_em), TO_CHAR(ped.criado_em, 'DD/MM')
+      ORDER BY data_ordem ASC, r.nome ASC;
+    `;
+
+    const result = await pool.query(query, valores);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Erro na rota /api/restaurantes/ticket-medio-dia:', err);
+    res.status(500).json({ erro: 'Erro ao buscar ticket médio por dia' });
   }
 });
 

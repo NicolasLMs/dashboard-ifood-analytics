@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iFood Analytics - Ticket Médio por Dia</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen">
+
+    <!-- Cabeçalho -->
+    <header class="bg-red-600 text-white shadow-md">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+            <div class="flex items-center gap-3">
+                <span class="bg-white text-red-600 font-extrabold px-3 py-1 rounded-lg text-lg tracking-tight">iFood</span>
+                <h1 class="text-xl font-bold">Relatório 3 — Ticket Médio por Dia</h1>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="index.html" class="text-xs bg-red-700 hover:bg-red-800 px-3 py-1 rounded-full transition">Painel de Vendas</a>
+                <a href="restaurante.html" class="text-xs bg-red-700 hover:bg-red-800 px-3 py-1 rounded-full transition">Painel de Restaurantes</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 py-6 space-y-6">
+
+        <!-- Filtros -->
+        <section class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+
+                <!-- Restaurante -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Restaurante</label>
+                    <select id="filtro-restaurante" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none">
+                        <option value="todos">Todos</option>
+                    </select>
+                </div>
+
+                <!-- Data Início -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Data Início</label>
+                    <input type="date" id="filtro-data-inicio" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none">
+                </div>
+
+                <!-- Data Fim -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Data Fim</label>
+                    <input type="date" id="filtro-data-fim" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none">
+                </div>
+
+                <!-- Botões -->
+                <div class="flex gap-2">
+                    <button onclick="carregarGrafico()" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg text-sm transition">
+                        Filtrar
+                    </button>
+                    <button onclick="limparFiltros()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-2 px-3 rounded-lg text-sm transition" title="Limpar">
+                        Limpar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Atalhos de Período -->
+            <div class="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2 flex-wrap">
+                <span class="text-xs text-slate-400 font-medium mr-1">Período rápido:</span>
+                <button onclick="definirPeriodo(0)"    class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition">Hoje</button>
+                <button onclick="definirPeriodo(7)"    class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition">Últimos 7 dias</button>
+                <button onclick="definirPeriodo(30)"   class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition">Últimos 30 dias</button>
+                <button onclick="definirPeriodo(null)" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition">Todo o período</button>
+            </div>
+        </section>
+
+        <!-- Gráfico de Linhas -->
+        <section class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div class="mb-4">
+                <h2 class="text-base font-bold text-slate-800">Ticket Médio por Dia</h2>
+                <p class="text-xs text-slate-400">Valor médio dos pedidos por dia, separado por restaurante</p>
+            </div>
+            <div class="relative h-96">
+                <canvas id="graficoTicketMedio"></canvas>
+            </div>
+        </section>
+
+        <!-- Tabela -->
+        <section class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100">
+                <h2 class="text-base font-bold text-slate-800">Detalhamento — Ticket Médio por Dia</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 text-slate-500 text-xs uppercase">
+                            <th class="py-3 px-6 font-semibold">Dia</th>
+                            <th class="py-3 px-6 font-semibold">Restaurante</th>
+                            <th class="py-3 px-6 font-semibold text-right">Itens Vendidos</th>
+                            <th class="py-3 px-6 font-semibold text-right">Pedidos</th>
+                            <th class="py-3 px-6 font-semibold text-right">Ticket Médio (por produto)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-ticket" class="divide-y divide-slate-100 text-sm">
+                        <!-- Preenchido via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        const API_URL = 'http://localhost:3000/api';
+        let chartInstance = null;
+
+        const CORES = [
+            '#dc2626', '#f97316', '#eab308', '#22c55e',
+            '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6',
+            '#f43f5e', '#a3e635',
+        ];
+
+        const formatarMoeda = v =>
+            Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        // Popula o select de restaurantes
+        async function carregarRestaurantes() {
+            try {
+                const res  = await fetch(`${API_URL}/restaurantes/lista`);
+                const lista = await res.json();
+                const select = document.getElementById('filtro-restaurante');
+                lista.forEach(r => {
+                    const opt = document.createElement('option');
+                    opt.value       = r.id;
+                    opt.textContent = r.nome;
+                    select.appendChild(opt);
+                });
+            } catch (err) {
+                console.error('Erro ao carregar restaurantes:', err);
+            }
+        }
+
+        // Busca dados e atualiza gráfico + tabela
+        async function carregarGrafico() {
+            const restauranteId = document.getElementById('filtro-restaurante').value;
+            const dataInicio    = document.getElementById('filtro-data-inicio').value;
+            const dataFim       = document.getElementById('filtro-data-fim').value;
+            const params        = new URLSearchParams({ restauranteId, dataInicio, dataFim });
+
+            try {
+                const res  = await fetch(`${API_URL}/restaurantes/ticket-medio-dia?${params}`);
+                const rows = await res.json();
+                renderizarGrafico(rows);
+                renderizarTabela(rows);
+            } catch (err) {
+                console.error('Erro ao carregar ticket médio:', err);
+            }
+        }
+
+        function renderizarGrafico(rows) {
+            const ctx = document.getElementById('graficoTicketMedio').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+
+            // Agrupa por restaurante
+            const porRestaurante = {};
+            const datasSet = new Set();
+
+            rows.forEach(r => {
+                if (!porRestaurante[r.restaurante]) porRestaurante[r.restaurante] = {};
+                porRestaurante[r.restaurante][r.data_formatada] = r.ticket_medio;
+                datasSet.add(r.data_formatada);
+            });
+
+            const labels  = [...datasSet];
+            const nomes   = Object.keys(porRestaurante);
+
+            const datasets = nomes.map((nome, i) => ({
+                label: nome,
+                data: labels.map(d => porRestaurante[nome][d] ?? null),
+                borderColor: CORES[i % CORES.length],
+                backgroundColor: CORES[i % CORES.length] + '22',
+                fill: false,
+                tension: 0.3,
+                pointRadius: 4,
+                spanGaps: false,
+            }));
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { font: { size: 12 }, padding: 16, boxWidth: 14 }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ` ${ctx.dataset.label}: ${formatarMoeda(ctx.parsed.y)}`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: v => 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderizarTabela(rows) {
+            const tbody = document.getElementById('tabela-ticket');
+            tbody.innerHTML = '';
+
+            if (rows.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-400">Nenhum dado encontrado para os filtros selecionados.</td></tr>`;
+                return;
+            }
+
+            rows.forEach(r => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition';
+                tr.innerHTML = `
+                    <td class="py-3 px-6 text-slate-600">${r.data_formatada}</td>
+                    <td class="py-3 px-6 font-semibold text-slate-800">${r.restaurante}</td>
+                    <td class="py-3 px-6 text-right text-slate-600">${r.total_itens} un.</td>
+                    <td class="py-3 px-6 text-right text-slate-600">${r.total_pedidos}</td>
+                    <td class="py-3 px-6 text-right font-bold text-emerald-600">${formatarMoeda(r.ticket_medio)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function definirPeriodo(dias) {
+            const inputInicio = document.getElementById('filtro-data-inicio');
+            const inputFim    = document.getElementById('filtro-data-fim');
+
+            if (dias === null) {
+                inputInicio.value = '';
+                inputFim.value    = '';
+            } else {
+                const hoje  = new Date();
+                const inicio = new Date();
+                inicio.setDate(hoje.getDate() - dias);
+                inputFim.value    = hoje.toISOString().split('T')[0];
+                inputInicio.value = inicio.toISOString().split('T')[0];
+            }
+            carregarGrafico();
+        }
+
+        function limparFiltros() {
+            document.getElementById('filtro-restaurante').value = 'todos';
+            definirPeriodo(null);
+        }
+
+        // Inicialização
+        window.addEventListener('DOMContentLoaded', async () => {
+            await carregarRestaurantes();
+            await carregarGrafico();
+        });
+    </script>
+</body>
+</html>
